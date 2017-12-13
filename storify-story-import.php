@@ -175,6 +175,7 @@ final class StorifyStoryImport {
 
 		// Load the classes that are only accessible via front end.
 		if ( ! is_admin() ) {
+			require_once STORIFY_STORY_IMPORT_INCLS . '/display.php';
 		}
 	}
 

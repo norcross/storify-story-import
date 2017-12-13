@@ -29,19 +29,33 @@ class StorifyStoryImport_Process {
 	 */
 	public function run_storify_request() {
 
-		// Bail without our key.
-		if ( empty( $_REQUEST['fetch-action'] ) ) {
-			return;
+		// Our trigger from the settings page.
+		if ( ! empty( $_POST['storify-import-trigger'] ) ) {
+
+			// preprint( $_POST, true );
+
+			// Set some variables.
+			$action = ! empty( $_POST['fetch-action'] ) ? sanitize_text_field( $_POST['fetch-action'] ) : '';
+			$user   = ! empty( $_POST['fetch-user-field'] ) ? sanitize_text_field( $_POST['fetch-user-field'] ) : '';
+			$slug   = ! empty( $_POST['fetch-slug-field'] ) ? sanitize_text_field( $_POST['fetch-slug-field'] ) : '';
+
+			// Handle my user fetching.
+			if ( ! empty( $user ) && 'fetch-user' === esc_attr( $action ) ) {
+				self::fetch_user_stories( $user );
+			}
+
 		}
 
-		// Handle my user fetching.
-		if ( ! empty( $_POST['fetch-action'] ) && ! empty( $_POST['fetch-user-field'] ) && 'fetch-user' === $_POST['fetch-action'] ) {
-			self::fetch_user_stories( $_POST['fetch-user-field'] );
-		}
+		// Our trigger from the posts page.
+		if ( ! empty( $_GET['storify-posts-trigger'] ) ) {
 
-		// Handle my elements fetching.
-		if ( ! empty( $_GET['fetch-action'] ) && ! empty( $_GET['fetch-id'] ) && 'fetch-elements' === $_GET['fetch-action'] ) {
-			self::fetch_story_elements( $_GET['fetch-id'] );
+			// preprint( $_GET, true );
+
+			// Handle my elements fetching.
+			if ( ! empty( $_GET['fetch-action'] ) && ! empty( $_GET['fetch-id'] ) && 'fetch-elements' === $_GET['fetch-action'] ) {
+				self::fetch_story_elements( $_GET['fetch-id'] );
+			}
+
 		}
 	}
 
@@ -296,41 +310,6 @@ class StorifyStoryImport_Process {
 		// Fetch my user.
 		$user   = wp_get_current_user();
 
-		// Loop the elements.
-		foreach ( $elements as $element ) {
-
-			// preprint( $element, true );
-
-			// Setup my args.
-			$setup  = array(
-				'comment_post_ID'       => absint( $post_id ),
-				'comment_author'        => $user->display_name,
-				'comment_content'       => '',
-				'comment_author_url'    => '',
-				'comment_author_email'  => $user->user_email,
-				'comment_type'          => 'storify-element',
-				'user_id'               => $user->ID,
-				'comment_date'          => date( 'Y-m-d H:i:s', $element['posted'] ),
-				'comment_approved'      => 1,
-			);
-
-			// Add my "comment",
-			$insert = wp_new_comment( $setup );
-
-			// Bail on error.
-			if ( empty( $insert ) || is_wp_error( $insert ) ) {
-				return false;
-			}
-
-			// Now all add my meta.
-			add_comment_meta( $insert, '_element_id', $element['id'], true );
-			add_comment_meta( $insert, '_element_eid', $element['eid'], true );
-			add_comment_meta( $insert, '_element_type', $element['type'], true );
-			add_comment_meta( $insert, '_element_link', $element['link'], true );
-			add_comment_meta( $insert, '_element_source', $element['source'], true );
-			add_comment_meta( $insert, '_element_attrib', $element['attrib'], true );
-		}
-
 		// Loop my stories.
 		foreach ( $elements as $element ) {
 
@@ -370,7 +349,7 @@ class StorifyStoryImport_Process {
 			'comment_author_email'  => $user->user_email,
 			'comment_type'          => 'storify-element',
 			'user_id'               => $user->ID,
-			'comment_date'          => date( 'Y-m-d H:i:s', $element['posted'] ),
+			'comment_date'          => date( 'Y-m-d H:i:s', $element['added'] ),
 			'comment_approved'      => 1,
 		);
 
@@ -416,7 +395,7 @@ class StorifyStoryImport_Process {
 			'comment_author_email'  => $user->user_email,
 			'comment_type'          => 'storify-element',
 			'user_id'               => $user->ID,
-			'comment_date'          => date( 'Y-m-d H:i:s', $element['posted'] ),
+			'comment_date'          => date( 'Y-m-d H:i:s', $element['added'] ),
 			'comment_approved'      => 1,
 		);
 

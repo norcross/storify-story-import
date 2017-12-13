@@ -155,8 +155,44 @@ class StorifyStoryImport_Helper {
 				'type'    => $element['type'],
 				'link'    => $element['permalink'],
 				'posted'  => strtotime( $element['posted_at'] ),
+				'added'   => strtotime( $element['added_at'] ),
 				'source'  => $element['source']['name'],
 				'attrib'  => $element['source']['username'],
+			);
+		}
+
+		// Return my data.
+		return $data;
+	}
+
+	/**
+	 * Take the large array of the element and break it down.
+	 *
+	 * @param  array $element  Our full array.
+	 *
+	 * @return array
+	 */
+	public static function parse_element_display( $elements ) {
+
+		// Set my empty array.
+		$data   = array();
+
+		// Loop the element and parse what we need.
+		foreach ( $elements as $element ) {
+
+			// Fetch all my meta.
+			//get_comment_meta( $element->comment_ID, '_element_id', true );
+			//get_comment_meta( $element->comment_ID, '_element_eid', true );
+			$type   = get_comment_meta( $element->comment_ID, '_element_type', true );
+			$link   = get_comment_meta( $element->comment_ID, '_element_link', true );
+			$source = get_comment_meta( $element->comment_ID, '_element_source', true );
+			//get_comment_meta( $element->comment_ID, '_element_attrib', true );
+
+			// Set my array.
+			$data[] = array(
+				'type'         => $type,
+				'link'         => $link,
+				'source'       => $source,
 			);
 		}
 

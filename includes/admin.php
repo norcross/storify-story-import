@@ -83,7 +83,19 @@ class StorifyStoryImport_Admin {
 			echo '<form method="post" action="' . menu_page_url( self::$menu_slug, 0 ) . '">';
 
 				// Our username + fetch button.
-				echo self::fetch_field( 'fetch-user', __( 'Username', 'storify-story-import' ), __( 'Get Stories', 'storify-story-import' ) );
+				echo self::fetch_user_field();
+
+				// And a quick hidden field to trigger it all.
+				echo '<input type="hidden" name="storify-import-trigger" value="1">';
+
+			// Close the form.
+			echo '</form>';
+
+			// Wrap our form.
+			echo '<form method="post" action="' . menu_page_url( self::$menu_slug, 0 ) . '">';
+
+				// Our single story fetch button.
+				echo self::fetch_single_field();
 
 				// And a quick hidden field to trigger it all.
 				echo '<input type="hidden" name="storify-import-trigger" value="1">';
@@ -98,17 +110,11 @@ class StorifyStoryImport_Admin {
 	/**
 	 * Create our combo text and button field.
 	 *
-	 * @param  string  $action  The name of the action we are doing.
-	 * @param  string  $label   The label for the field.
-	 * @param  string  $text    The button text.
 	 * @param  boolean $echo    Whether to echo it out or not.
 	 *
 	 * @return HTML
 	 */
-	public static function fetch_field( $action = '', $label = '', $text = '', $echo = false ) {
-
-		// Make my nonce item.
-		$nonce  = $action . '-nonce';
+	public static function fetch_user_field( $echo = false ) {
 
 		// Set an empty.
 		$field  = '';
@@ -117,19 +123,70 @@ class StorifyStoryImport_Admin {
 		$field .= '<p class="storify-import-field-wrapper">';
 
 			// Add the label.
-			$field .= '<span class="storify-import-label">' . esc_html( $label ) . '</span>';
+			$field .= '<span class="storify-import-label">' . esc_html__( 'Username', 'storify-story-import' ) . '</span>';
 
 			// The input field.
-			$field .= '<input id="' . esc_attr( $action ) . '" name="' . esc_attr( $action ) . '-field" class="storify-import-field" type="text" value="">';
+			$field .= '<input id="fetch-user" name="fetch-user-field" class="storify-import-field" type="text" value="">';
 
 			// The button field.
-			$field .= '<button id="' . esc_attr( $action ) . '-action" name="fetch-action" class="storify-import-button button button-small button-secondary" value="' . esc_attr( $action ) . '" type="submit">' . esc_html( $text ) . '</button>';
+			$field .= '<button id="fetch-user-action" name="fetch-action" class="storify-import-button button button-small button-secondary" value="fetch-user" type="submit">' . esc_html__( 'Get Stories', 'storify-story-import' ) . '</button>';
 
 			// And some text.
-			$field .= '<span class="description">' . __( 'Enter the required field to retrieve data.', 'storify-story-import' ) . '</span>';
+			$field .= '<span class="description">' . esc_html__( 'Enter the Storify username to retrieve data.', 'storify-story-import' ) . '</span>';
 
 			// And a nonce.
-			$field .= wp_nonce_field( $nonce, $nonce, false, false );
+			$field .= wp_nonce_field( 'fetch-user-action', 'fetch-user-nonce', false, false );
+
+		// Close it up.
+		$field .= '</p>';
+
+		// Echo if requested.
+		if ( ! empty( $echo ) ) {
+			echo $field;
+		}
+
+		// Just return it.
+		return $field;
+	}
+
+	/**
+	 * Create our combo text and button field.
+	 *
+	 * @param  boolean $echo    Whether to echo it out or not.
+	 *
+	 * @return HTML
+	 */
+	public static function fetch_single_field( $echo = false ) {
+
+		// Set an empty.
+		$field  = '';
+
+		// Open it up.
+		$field .= '<p class="storify-import-field-wrapper">';
+
+			// Add the label.
+			$field .= '<span class="storify-import-label">' . esc_html__( 'Username', 'storify-story-import' ) . '</span>';
+
+			// The username input field.
+			$field .= '<input id="fetch-user" name="fetch-user-field" class="storify-import-field" type="text" value="">';
+
+			// Breakin' it.
+			$field .= '<br>';
+
+			// The slug label.
+			$field .= '<span class="storify-import-label">' . esc_html__( 'Story Slug', 'storify-story-import' ) . '</span>';
+
+			// The slug input field.
+			$field .= '<input id="fetch-slug" name="fetch-slug-field" class="storify-import-field" type="text" value="">';
+
+			// The button field.
+			$field .= '<button id="fetch-single-action" name="fetch-action" class="storify-import-button button button-small button-secondary" value="fetch-single" type="submit">' . esc_html__( 'Get Single', 'storify-story-import' ) . '</button>';
+
+			// And some text.
+			$field .= '<span class="description">' . esc_html__( 'Enter the Storify username and story slug to retrieve data.', 'storify-story-import' ) . '</span>';
+
+			// And a nonce.
+			$field .= wp_nonce_field( 'fetch-single-action', 'fetch-single-nonce', false, false );
 
 		// Close it up.
 		$field .= '</p>';
@@ -168,7 +225,7 @@ class StorifyStoryImport_Admin {
 		$label  = empty( $check ) ? __( 'Fetch Elements', 'storify-story-import' ) : __( 'Update Elements', 'storify-story-import' );
 
 		// First make the link.
-		$link   = add_query_arg( array( 'post_type' => 'storify-stories', 'fetch-action' => 'fetch-elements', 'fetch-id' => $post->ID ), admin_url( 'edit.php' ) );
+		$link   = add_query_arg( array( 'post_type' => 'storify-stories', 'storify-posts-trigger' => 1, 'fetch-action' => 'fetch-elements', 'fetch-id' => $post->ID ), admin_url( 'edit.php' ) );
 
 		// Return the string or the markup.
 		$actions['storify'] = '<a title="' . esc_attr( $label ) . '" href="' . esc_url( $link ) . '">' . esc_html( $label ) . '</a>';
