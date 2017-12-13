@@ -39,15 +39,65 @@ class StorifyStoryImport_Helper {
 	 *
 	 * @param  string $slug  The slug we're checking for.
 	 *
-	 * @return boolean
+	 * @return boolean / integer
 	 */
 	public static function maybe_story_exists( $slug = '' ) {
 
-		// Do the exists check.
-		$exists = get_page_by_path( $slug, OBJECT, 'storify-stories' );
+		// Call the global database.
+		global $wpdb;
 
-		// Return the boolean of existence.
-		return ! empty( $exists ) ? $exists->ID : false;
+		// Set up our query.
+		$setup  = $wpdb->prepare("
+			SELECT  post_id
+			FROM    $wpdb->postmeta
+			WHERE   meta_key = '%s'
+			AND     meta_value = '%s'
+			LIMIT   1
+		", esc_sql( '_storify_slug' ), esc_sql( $slug ) );
+
+		// Process the query.
+		$query  = $wpdb->get_col( $setup );
+
+		// Bail if no items came back.
+		if ( empty( $query ) || empty( $query[0] ) ) {
+			return false;
+		}
+
+		// Return my post ID.
+		return absint( $query[0] );
+	}
+
+	/**
+	 * Check to see if the element (comment) already exists.
+	 *
+	 * @param  string $id  The original ID from Storify that we kept.
+	 *
+	 * @return boolean / integer
+	 */
+	public static function maybe_element_exists( $id = '' ) {
+
+		// Call the global database.
+		global $wpdb;
+
+		// Set up our query.
+		$setup  = $wpdb->prepare("
+			SELECT  comment_id
+			FROM    $wpdb->commentmeta
+			WHERE   meta_key = '%s'
+			AND     meta_value = '%s'
+			LIMIT   1
+		", esc_sql( '_element_id' ), esc_sql( $id ) );
+
+		// Process the query.
+		$query  = $wpdb->get_col( $setup );
+
+		// Bail if no items came back.
+		if ( empty( $query ) || empty( $query[0] ) ) {
+			return false;
+		}
+
+		// Return my post ID.
+		return absint( $query[0] );
 	}
 
 	/**
@@ -72,8 +122,41 @@ class StorifyStoryImport_Helper {
 				'slug'         => $story['slug'],
 				'status'       => $story['status'],
 				'description'  => $story['description'],
-				'created'      => $story['date']['created'],
-				'published'    => $story['date']['published'],
+				'created'      => strtotime( $story['date']['created'] ),
+				'published'    => strtotime( $story['date']['published'] ),
+			);
+		}
+
+		// Return my data.
+		return $data;
+	}
+
+	/**
+	 * Take the large array of elements for a user and break it down.
+	 *
+	 * @param  array $stories  Our full array.
+	 *
+	 * @return string / array
+	 */
+	public static function parse_element_list( $elements = array(), $post_id = 0 ) {
+
+		// preprint( $elements, true );
+
+		// Set my empty array.
+		$data   = array();
+
+		// Loop the elements and parse what we need.
+		foreach ( $elements as $element ) {
+
+			// Set my array.
+			$data[] = array(
+				'id'      => $element['id'],
+				'eid'     => $element['eid'],
+				'type'    => $element['type'],
+				'link'    => $element['permalink'],
+				'posted'  => strtotime( $element['posted_at'] ),
+				'source'  => $element['source']['name'],
+				'attrib'  => $element['source']['username'],
 			);
 		}
 

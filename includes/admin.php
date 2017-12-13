@@ -27,6 +27,7 @@ class StorifyStoryImport_Admin {
 	public function init() {
 		add_action( 'admin_enqueue_scripts',                  array( $this, 'scripts_styles'      ),  10      );
 		add_action( 'admin_menu',                             array( $this, 'settings_menu'       )           );
+		add_filter( 'post_row_actions',                       array( $this, 'add_elements_link'   ),  10, 2   );
 		add_filter( 'plugin_action_links',                    array( $this, 'quick_link'          ),  10, 2   );
 	}
 
@@ -140,6 +141,40 @@ class StorifyStoryImport_Admin {
 
 		// Just return it.
 		return $field;
+	}
+
+	/**
+	 * Filters the array of row action links on the supported post type list table.
+	 *
+	 * @param  array   $actions  The existing array of actions.
+	 * @param  WP_Post $post     The post object.
+	 *
+	 * @return array   $actions  The modified array of actions.
+	 */
+	public function add_elements_link( $actions, $post ) {
+
+		// Bail if we aren't on the post type.
+		if ( 'storify-stories' !== $post->post_type ) {
+			return $actions;
+		}
+
+		// Check if we've done this.
+		$check  = get_post_meta( $post->ID, '_storify_elements', true );
+
+		// Get my slug.
+		$slug   = get_post_meta( $post->ID, '_storify_slug', true );
+
+		// Make my label.
+		$label  = empty( $check ) ? __( 'Fetch Elements', 'storify-story-import' ) : __( 'Update Elements', 'storify-story-import' );
+
+		// First make the link.
+		$link   = add_query_arg( array( 'post_type' => 'storify-stories', 'fetch-action' => 'fetch-elements', 'fetch-id' => $post->ID ), admin_url( 'edit.php' ) );
+
+		// Return the string or the markup.
+		$actions['storify'] = '<a title="' . esc_attr( $label ) . '" href="' . esc_url( $link ) . '">' . esc_html( $label ) . '</a>';
+
+		// And return our actions.
+		return $actions;
 	}
 
 	/**

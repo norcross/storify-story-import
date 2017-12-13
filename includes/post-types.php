@@ -62,7 +62,7 @@ class StorifyStoryImport_PostTypes {
 			'query_var'             => true,
 			'rewrite'               => array( 'slug' => 'storify', 'with_front' => false ),
 			'has_archive'           => 'storify',
-			'supports'              => array( 'title', 'editor', 'excerpt', 'comments', 'thumbnail' ),
+			'supports'              => array( 'title', 'excerpt', 'thumbnail' ),
 		);
 
 		// Our last-chance filter for everything. If someone cleared the args, just bail.
