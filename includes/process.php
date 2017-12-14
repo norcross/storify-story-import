@@ -37,11 +37,16 @@ class StorifyStoryImport_Process {
 			// Set some variables.
 			$action = ! empty( $_POST['fetch-action'] ) ? sanitize_text_field( $_POST['fetch-action'] ) : '';
 			$user   = ! empty( $_POST['fetch-user-field'] ) ? sanitize_text_field( $_POST['fetch-user-field'] ) : '';
-			$slug   = ! empty( $_POST['fetch-slug-field'] ) ? sanitize_text_field( $_POST['fetch-slug-field'] ) : '';
+			$single = ! empty( $_POST['fetch-single-field'] ) ? sanitize_text_field( $_POST['fetch-single-field'] ) : '';
 
 			// Handle my user fetching.
 			if ( ! empty( $user ) && 'fetch-user' === esc_attr( $action ) ) {
 				self::fetch_user_stories( $user );
+			}
+
+			// Handle my single fetching.
+			if ( ! empty( $single ) && 'fetch-single' === esc_attr( $action ) ) {
+				self::fetch_single_story( $single );
 			}
 
 		}
@@ -82,6 +87,53 @@ class StorifyStoryImport_Process {
 		if ( empty( $call['content']['stories'] ) ) {
 			wp_die( 'No stories', 'Data error' ); // Need some real error returns.
 		}
+
+		// Parse my list.
+		if ( false === $stories = StorifyStoryImport_Helper::parse_story_list( $call['content']['stories'] ) ) {
+			wp_die( 'No story data', 'Data error' ); // Need some real error returns.
+		}
+
+		// Run the creation.
+		if ( false === $create = self::process_user_stories( $stories, $user ) ) {
+			wp_die( 'No story created', 'Data error' ); // Need some real error returns.
+		}
+
+		// First make the link.
+		$link   = add_query_arg( array( 'post_type' => 'storify-stories', 'page' => 'storify-import-settings', 'fetch-completed' => 1  ), admin_url( 'edit.php' ) );
+
+		// Redirect and exit.
+		wp_redirect( $link );
+		exit();
+	}
+
+	/**
+	 * Fetch a single story.
+	 *
+	 * @param  string $single  The URL of the story.
+	 *
+	 * @return mixed
+	 */
+	public static function fetch_single_story( $single = '' ) {
+
+		// Get the path parsed out for the API call.
+		$parsed = parse_url( $single, PHP_URL_PATH );
+
+		// Fetch our items.
+		$call   = self::make_api_call( 'stories' . $parsed );
+
+		// preprint( $call, true );
+
+		// Bail with no request data.
+		if ( empty( $call ) || empty( $call['content'] ) ) {
+			wp_die( 'No element content', 'Data error' ); // Need some real error returns.
+		}
+
+		// Bail with no stories.
+		if ( empty( $call['content']['elements'] ) ) {
+			wp_die( 'No elements', 'Data error' ); // Need some real error returns.
+		}
+
+		preprint( $call['content']['elements'], true );
 
 		// Parse my list.
 		if ( false === $stories = StorifyStoryImport_Helper::parse_story_list( $call['content']['stories'] ) ) {
@@ -160,7 +212,7 @@ class StorifyStoryImport_Process {
 		$url   = 'http://api.storify.com/v1/' . $endpoint;
 
 		// Set my args.
-		$args = array();
+		$args = array( 'per_page' => 50 );
 
 		// Make the API call.
 		$call = wp_remote_get( $url, $args );

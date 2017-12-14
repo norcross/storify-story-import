@@ -17,8 +17,13 @@ p.storify-import-field-wrapper .storify-import-label {
 	vertical-align: middle;
 }
 
+p.storify-import-field-wrapper .storify-import-description {
+	display: inline-block;
+	vertical-align: middle;
+}
+
 p.storify-import-field-wrapper .storify-import-field {
-	width: 15em;
+	width: 300px;
 	margin-right: 5px;
 	display: inline-block;
 	vertical-align: middle;

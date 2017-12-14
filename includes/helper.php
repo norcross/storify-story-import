@@ -200,6 +200,18 @@ class StorifyStoryImport_Helper {
 		return $data;
 	}
 
+	/**
+	 * Take our full Storify URL and get my parts.
+	 *
+	 * @param  string $single  The single URL.
+	 *
+	 * @return string
+	 */
+	public static function parse_single_url( $single = '' ) {
+
+		$parse = parse_url( $single, PHP_URL_PATH );
+	}
+
 	// End our class.
 }
 
