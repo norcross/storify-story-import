@@ -25,11 +25,34 @@ class StorifyStoryImport_Admin {
 	 * @return void
 	 */
 	public function init() {
-		add_action( 'admin_notices',                          array( $this, 'data_import_result'  )           );
-		add_action( 'admin_enqueue_scripts',                  array( $this, 'scripts_styles'      ),  10      );
-		add_action( 'admin_menu',                             array( $this, 'settings_menu'       )           );
-		add_filter( 'post_row_actions',                       array( $this, 'add_elements_link'   ),  10, 2   );
-		add_filter( 'plugin_action_links',                    array( $this, 'quick_link'          ),  10, 2   );
+		add_action( 'admin_notices',                          array( $this, 'data_import_result'    )           );
+		add_filter( 'parse_comment_query',                    array( $this, 'exclude_comment_list'  )           );
+		add_action( 'admin_enqueue_scripts',                  array( $this, 'scripts_styles'        ),  10      );
+		add_action( 'admin_menu',                             array( $this, 'settings_menu'         )           );
+		add_filter( 'post_row_actions',                       array( $this, 'add_elements_link'     ),  10, 2   );
+		add_filter( 'plugin_action_links',                    array( $this, 'quick_link'            ),  10, 2   );
+	}
+
+	/**
+	 * Set the default sort order for various items
+	 *
+	 * @param  object $query  The existing WP_Comment_Query Object.
+	 *
+	 * @return object $query  The modified WP_Comment_Query Object.
+	 */
+	public function exclude_comment_list( $query ) {
+
+		// preprint( $query->query_vars );
+
+		// Remove the story-element type unless bypassed.
+		if ( false !== apply_filters( 'storify_story_import_exclude_comments', true, $query ) ) {
+			$query->query_vars['type__not_in'] = array( 'storify-element' );
+		}
+
+		// preprint( $query, true );
+
+		// And send back the query.
+		return $query;
 	}
 
 	/**
@@ -298,7 +321,12 @@ class StorifyStoryImport_Admin {
 	public function add_elements_link( $actions, $post ) {
 
 		// Bail if we aren't on the post type.
-		if ( 'storify-stories' !== $post->post_type || ! empty( $_GET['post_status'] ) && 'trash' === sanitize_key( $_GET['post_status'] ) ) {
+		if ( 'storify-stories' !== $post->post_type ) {
+			return $actions;
+		}
+
+		// Bail on trash or draft page.
+		if ( ! empty( $_GET['post_status'] ) && in_array( $_GET['post_status'], array( 'trash', 'draft' ) ) ) {
 			return $actions;
 		}
 
