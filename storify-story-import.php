@@ -267,20 +267,21 @@ final class StorifyStoryImport {
 	/**
 	 * Run our API call to Storify.
 	 *
-	 * @param  string $endpoint  The endpoint of the API we are going to.
+	 * @param  string  $endpoint  The endpoint of the API we are going to.
+	 * @param  integer $paged     Which page to fetch. Defaults to page 1.
 	 *
 	 * @return mixed
 	 */
-	public function make_api_call( $endpoint = '' ) {
+	public function make_api_call( $endpoint = '', $page = 1 ) {
 
 		// Set my URL.
 		$url   = 'https://api.storify.com/v1/' . $endpoint;
 
 		// Set my args.
-		$args = array( 'per_page' => 50 );
+		$setup = add_query_arg( array( 'page' => $page, 'per_page' => 30, 'direction' => 'asc' ), esc_url_raw( $url ) );
 
 		// Make the API call.
-		$call = wp_remote_get( $url, $args );
+		$call = wp_remote_get( $setup, array() );
 
 		// Pull the guts.
 		$guts = wp_remote_retrieve_body( $call );

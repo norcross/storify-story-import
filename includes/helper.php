@@ -258,6 +258,59 @@ class StorifyStoryImport_Helper {
 		return $data;
 	}
 
+	/**
+	 * Get our whole array of story elements.
+	 *
+	 * @param  array  $content   All the content elements.
+	 * @param  string $endpoint  The user story endpoint.
+	 *
+	 * @return array
+	 */
+	public static function merge_story_elements( $content = array(), $endpoint = '' ) {
+
+		// preprint( $content, true );
+		// preprint( $content['totalElements'] );
+		// preprint( $content['elements'], true );
+
+		// Set our elements as a data item, which we may be adding.
+		$data   = $content['elements'];
+
+		// preprint( $data, true );
+
+		// Determine how many totals.
+		$total  = ! empty( $content['totalElements'] ) ? $content['totalElements'] : 29;
+
+		// preprint( $total, true );
+
+		// If we have less than 30, just return the array.
+		if ( absint( $total ) <= 30 ) {
+			return $data;
+		}
+
+		// Set my pages.
+		$pages  = ceil( $total / 30 );
+
+		// preprint( $pages, true );
+
+		// Do a simple for loop, but starting at 2 since we already have page 1.
+		for ( $i = 2; $i <= absint( $pages ); $i++ ) {
+
+			// Pull more.
+			$more   = storify_story_import()->make_api_call( $endpoint, $i );
+
+			// Bail with no elements.
+			if ( empty( $more['content']['elements'] ) ) {
+				continue;
+			}
+
+			// Merge the data.
+			$data   = array_merge( $more['content']['elements'], $data );
+		}
+
+		// Return the merged array.
+		return $data;
+	}
+
 	// End our class.
 }
 

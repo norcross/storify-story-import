@@ -205,8 +205,11 @@ class StorifyStoryImport_Process {
 			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'missing_story_slug' ) );
 		}
 
+		// Make our endpoint.
+		$endpnt = 'stories/' . esc_attr( $user ) . '/' . esc_attr( $slug );
+
 		// Fetch our items.
-		$call   = storify_story_import()->make_api_call( 'stories/' . $user . '/' . $slug );
+		$call   = storify_story_import()->make_api_call( $endpnt );
 
 		// preprint( $call, true );
 
@@ -215,7 +218,14 @@ class StorifyStoryImport_Process {
 			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'no_single_story_content' ) );
 		}
 
+		// unset( $call['content']['stats'] );
+		// unset( $call['content']['author'] );
+
 		// preprint( $call['content'], true );
+
+		// preprint( $call['content']['totalElements'] );
+		// preprint( count( $call['content']['elements'] ) );
+		// preprint( $call['content']['elements'], true );
 
 		// Bail with no stories.
 		if ( empty( $call['content']['elements'] ) ) {
@@ -224,8 +234,15 @@ class StorifyStoryImport_Process {
 
 		// preprint( $call['content']['elements'], true );
 
+		// Do the looping to figure it out all the elements.
+		if ( false === $merged = StorifyStoryImport_Helper::merge_story_elements( $call['content'], $endpnt ) ) {
+			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'invalid_single_story_elements' ) );
+		}
+
+		// preprint( $merged, true );
+
 		// Parse my list.
-		if ( false === $elements = StorifyStoryImport_Helper::parse_element_list( $call['content']['elements'], $post_id ) ) {
+		if ( false === $elements = StorifyStoryImport_Helper::parse_element_list( $merged, $post_id ) ) {
 			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'no_single_elements_data' ) );
 		}
 
@@ -233,7 +250,7 @@ class StorifyStoryImport_Process {
 
 		// Run the creation.
 		if ( false === $create = self::process_story_elements( $elements, $post_id ) ) {
-			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'no_single_elements_data' ) );
+			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'no_single_elements_create' ) );
 		}
 
 		// Process the admin redirect.

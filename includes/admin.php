@@ -122,6 +122,10 @@ class StorifyStoryImport_Admin {
 				$errmsg = __( 'There were no data elements returned by the Storify API for this story.', 'storify-story-import' );
 				break;
 
+			case 'invalid_single_story_elements' :
+				$errmsg = __( 'The element data for this story could not be properly formatted.', 'storify-story-import' );
+				break;
+
 			case 'no_single_elements_create' :
 				$errmsg = __( 'This story could not be updated based on the provided data.', 'storify-story-import' );
 				break;
@@ -294,7 +298,7 @@ class StorifyStoryImport_Admin {
 	public function add_elements_link( $actions, $post ) {
 
 		// Bail if we aren't on the post type.
-		if ( 'storify-stories' !== $post->post_type ) {
+		if ( 'storify-stories' !== $post->post_type || ! empty( $_GET['post_status'] ) && 'trash' === sanitize_key( $_GET['post_status'] ) ) {
 			return $actions;
 		}
 
