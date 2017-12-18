@@ -267,7 +267,7 @@ class StorifyStoryImport_Admin {
 			$field .= '<input id="fetch-' . esc_attr( $action ) . '" name="fetch-' . esc_attr( $action ) . '-field" class="storify-import-field" type="' . esc_attr( $args['type'] ) . '" value="">';
 
 			// The button field.
-			$field .= '<button id="fetch-' . esc_attr( $action ) . '-action" name="fetch-action" class="storify-import-button button button-small button-secondary" value="fetch-' . esc_attr( $action ) . '" type="submit">' . esc_html( $args['button'] ) . '</button>';
+			$field .= '<button id="fetch-' . esc_attr( $action ) . '-action" name="fetch-action" class="storify-import-button button button-small button-secondary" value="' . esc_attr( $action ) . '" type="submit">' . esc_html( $args['button'] ) . '</button>';
 
 			// And some text.
 			$field .= '<span class="description storify-import-description">' . esc_html( $args['desc'] ) . '</span>';
@@ -312,7 +312,7 @@ class StorifyStoryImport_Admin {
 		$label  = empty( $check ) ? __( 'Fetch Elements', 'storify-story-import' ) : __( 'Update Elements', 'storify-story-import' );
 
 		// First make the link.
-		$link   = add_query_arg( array( 'post_type' => 'storify-stories', 'storify-elements-trigger' => 1, 'fetch-id' => $post->ID ), admin_url( 'edit.php' ) );
+		$link   = add_query_arg( array( 'post_type' => 'storify-stories', 'storify-elements-trigger' => 1, 'fetch-action' => 'elements', 'fetch-id' => $post->ID ), admin_url( 'edit.php' ) );
 
 		// Return the string or the markup.
 		$actions['storify'] = '<a title="' . esc_attr( $label ) . '" href="' . esc_url( $link ) . '">' . esc_html( $label ) . '</a>';

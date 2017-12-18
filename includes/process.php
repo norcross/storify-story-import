@@ -42,15 +42,14 @@ class StorifyStoryImport_Process {
 			// @@todo add the nonce check
 
 			// Handle my user fetching.
-			if ( 'fetch-user' === esc_attr( $action ) ) {
+			if ( 'user' === esc_attr( $action ) ) {
 				self::fetch_user_stories( $user );
 			}
 
 			// Handle my single fetching.
-			if ( 'fetch-single' === esc_attr( $action ) ) {
+			if ( 'single' === esc_attr( $action ) ) {
 				self::fetch_single_story( $single );
 			}
-
 		}
 
 		// Our trigger from the posts page.
@@ -58,12 +57,20 @@ class StorifyStoryImport_Process {
 
 			// preprint( $_GET, true );
 
-			// Parse out my ID.
-			$id = ! empty( $_GET['fetch-id'] ) ? absint( $_GET['fetch-id'] ) : 0;
+			// Set some variables.
+			$action = ! empty( $_GET['fetch-action'] ) ? sanitize_text_field( $_GET['fetch-action'] ) : '';
+			$id     = ! empty( $_GET['fetch-id'] ) ? absint( $_GET['fetch-id'] ) : 0;
+
+			// @@todo add the nonce check
 
 			// Handle my elements fetching.
-			self::fetch_story_elements( $id );
+			if ( 'elements' === esc_attr( $action ) ) {
+				self::fetch_story_elements( $id );
+			}
 		}
+
+		// Add the action to do other things.
+		do_action( 'storify_story_import_trigger_action' );
 	}
 
 	/**
@@ -80,27 +87,59 @@ class StorifyStoryImport_Process {
 			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'missing_username' ) );
 		}
 
-		// Fetch our items.
-		$call   = storify_story_import()->make_api_call( 'stories/' . $user );
+		// Get my count of stories.
+		$count  = StorifyStoryImport_Helper::get_user_story_count( $user );
 
-		// preprint( $call, true );
+		// preprint( $count, true );
 
-		// Bail with no request data.
-		if ( empty( $call ) || empty( $call['content'] ) ) {
-			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_user_content' ) );
+		// Handle our less than 30.
+		if ( absint( $count ) <= 30 ) {
+
+			// Fetch our items.
+			$call   = storify_story_import()->make_api_call( 'stories/' . $user  );
+
+			// unset( $call['content']['stories'] );
+			// preprint( $call, true );
+
+			// Bail with no request data.
+			if ( empty( $call ) || empty( $call['content'] ) ) {
+				storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_user_content' ) );
+			}
+
+			// preprint( $call['content'], true );
+
+			// Bail with no stories.
+			if ( empty( $call['content']['stories'] ) ) {
+				storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_user_stories' ) );
+			}
+
+			// preprint( $call['content']['stories'], true );
+
+			// Parse my list.
+			if ( false === $stories = StorifyStoryImport_Helper::parse_story_list( $call['content']['stories'] ) ) {
+				storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_user_story_data' ) );
+			}
+
+			// preprint( $stories, true );
+
+			// Run the creation.
+			if ( false === $create = self::process_user_stories( $stories, $user ) ) {
+				storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_user_story_create' ) );
+			}
+
+			// Process the admin redirect.
+			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings' ), false );
 		}
 
-		// preprint( $call['content'], true );
-
-		// Bail with no stories.
-		if ( empty( $call['content']['stories'] ) ) {
-			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_user_stories' ) );
+		// Do the looping to figure it out all the elements.
+		if ( false === $merged = StorifyStoryImport_Helper::merge_user_stories( $user, $count ) ) {
+			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'invalid_user_story_list' ) );
 		}
 
-		// preprint( $call['content']['stories'], true );
+		// preprint( $merged, true );
 
 		// Parse my list.
-		if ( false === $stories = StorifyStoryImport_Helper::parse_story_list( $call['content']['stories'] ) ) {
+		if ( false === $stories = StorifyStoryImport_Helper::parse_story_list( $merged ) ) {
 			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_user_story_data' ) );
 		}
 

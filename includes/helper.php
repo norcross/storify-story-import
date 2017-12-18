@@ -259,6 +259,68 @@ class StorifyStoryImport_Helper {
 	}
 
 	/**
+	 * Figure out how many stories we have to fetch.
+	 *
+	 * @param  string $username  The username to check.
+	 *
+	 * @return integer
+	 */
+	public static function get_user_story_count( $username = '' ) {
+
+		// Fetch the user profile.
+		$user   = storify_story_import()->make_api_call( 'users/' . $username  );
+
+		// Bail without a user.
+		if ( empty( $user ) ) {
+			return;
+		}
+
+		// preprint( $user, true );
+
+		// @@todo Need more error checking here.
+
+		// Return my count.
+		return $user['content']['stats']['stories'];
+	}
+
+	/**
+	 * Get our whole array of a user's stories.
+	 *
+	 * @param  array  $content   All the content elements.
+	 * @param  string $endpoint  The user story endpoint.
+	 *
+	 * @return array
+	 */
+	public static function merge_user_stories( $username = '', $total = 0 ) {
+
+		// Set our stories as an empty variable.
+		$data   = array();
+
+		// Set my pages.
+		$pages  = ceil( $total / 30 );
+
+		// preprint( $pages, true );
+
+		// Do a simple for loop, but starting at 2 since we already have page 1.
+		for ( $i = 1; $i <= absint( $pages ); $i++ ) {
+
+			// Pull more.
+			$items  = storify_story_import()->make_api_call( 'stories/' . $username, $i );
+
+			// Bail with no elements.
+			if ( empty( $items['content']['stories'] ) ) {
+				continue;
+			}
+
+			// Merge the data.
+			$data   = array_merge( $items['content']['stories'], $data );
+		}
+
+		// Return the merged array.
+		return $data;
+	}
+
+	/**
 	 * Get our whole array of story elements.
 	 *
 	 * @param  array  $content   All the content elements.
