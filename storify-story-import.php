@@ -233,6 +233,62 @@ final class StorifyStoryImport {
 		}
 	}
 
+	/**
+	 * Parse and then run the admin redirect.
+	 *
+	 * @param  array   $args   The args we wanna add to the query string.
+	 * @param  boolean $error  Whether it was a successful action.
+	 * @param  string  $url    A URL to use as the base. Optional.
+	 *
+	 * @return void
+	 */
+	public function admin_redirect( $args = array(), $error = true, $url = '' ) {
+
+		// Determine the result.
+		$result = ! empty( $error ) ? 'error' : 'success';
+
+		// Set my base args.
+		$base   = array( 'post_type' => 'storify-stories', 'storify-fetch-result' => $result, 'storify-fetch-completed' => 1 );
+
+		// Merge our args.
+		$setup  = ! empty( $args ) ? wp_parse_args( $args, $base ) : $base ;
+
+		// Confirm my URL.
+		$url    = ! empty( $url ) ? $url : admin_url( 'edit.php' );
+
+		// Now make the link.
+		$link   = add_query_arg( $setup, esc_url_raw( $url ) );
+
+		// Redirect and exit.
+		wp_redirect( $link );
+		exit();
+	}
+
+	/**
+	 * Run our API call to Storify.
+	 *
+	 * @param  string $endpoint  The endpoint of the API we are going to.
+	 *
+	 * @return mixed
+	 */
+	public function make_api_call( $endpoint = '' ) {
+
+		// Set my URL.
+		$url   = 'https://api.storify.com/v1/' . $endpoint;
+
+		// Set my args.
+		$args = array( 'per_page' => 50 );
+
+		// Make the API call.
+		$call = wp_remote_get( $url, $args );
+
+		// Pull the guts.
+		$guts = wp_remote_retrieve_body( $call );
+
+		// Return my stuff.
+		return json_decode( $guts, true );
+	}
+
 	// End our class.
 }
 
@@ -252,3 +308,47 @@ function storify_story_import() {
 	return StorifyStoryImport::instance();
 }
 storify_story_import();
+
+// Only for debugging as we build this out.
+if ( ! function_exists( 'preprint' ) ) {
+	/**
+	 * Display array results in a readable fashion.
+	 *
+	 * @param  mixed   $display  The output we want to display.
+	 * @param  boolean $die      Whether or not to die as soon as output is generated.
+	 * @param  boolean $return   Whether to return the output or show it.
+	 *
+	 * @return mixed             Our printed (or returned) output.
+	 */
+	function preprint( $display, $die = false, $return = false ) {
+
+		// Set an empty.
+		$code   = '';
+
+		// Add some CSS to make it a bit more readable.
+		$style  = 'background-color: #fff; color: #000; font-size: 16px; line-height: 22px; padding: 5px; white-space: pre-wrap; white-space: -moz-pre-wrap; white-space: -pre-wrap; white-space: -o-pre-wrap; word-wrap: break-word;';
+
+		// Filter the style.
+		$style  = apply_filters( 'rkv_preprint_style', $style );
+
+		// Generate the actual output.
+		$code  .= '<pre style="' . $style . '">';
+		$code  .= print_r( $display, 1 );
+		$code  .= '</pre>';
+
+		// Return if requested.
+		if ( $return ) {
+			return $code;
+		}
+
+		// Print if requested (the default).
+		if ( ! $return ) {
+			print $code;
+		}
+
+		// Die if you want to die.
+		if ( $die ) {
+			die();
+		}
+	}
+}

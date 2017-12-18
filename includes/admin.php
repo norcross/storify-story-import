@@ -25,10 +25,120 @@ class StorifyStoryImport_Admin {
 	 * @return void
 	 */
 	public function init() {
+		add_action( 'admin_notices',                          array( $this, 'data_import_result'  )           );
 		add_action( 'admin_enqueue_scripts',                  array( $this, 'scripts_styles'      ),  10      );
 		add_action( 'admin_menu',                             array( $this, 'settings_menu'       )           );
 		add_filter( 'post_row_actions',                       array( $this, 'add_elements_link'   ),  10, 2   );
 		add_filter( 'plugin_action_links',                    array( $this, 'quick_link'          ),  10, 2   );
+	}
+
+	/**
+	 * Display the message based on our fetch result.
+	 *
+	 * @return void
+	 */
+	public function data_import_result() {
+
+		// Make sure we are handling a fetch.
+		if ( empty( $_GET['storify-fetch-completed'] ) ) {
+			return;
+		}
+
+		// If it worked, handle it quickly.
+		if ( ! empty( $_GET['storify-fetch-result'] ) && 'success' === sanitize_key( $_GET['storify-fetch-result'] ) ) {
+
+			// And handle the notice.
+			echo '<div class="notice notice-success is-dismissible storify-fetch-result-message">';
+				echo '<p>' . esc_html__( 'The requested Storify data has been successfully imported!', 'storify-story-import' ) . '</p>';
+			echo '</div>';
+
+			// Then be done.
+			return;
+		}
+
+		// Determine my error type.
+		$error  = ! empty( $_GET['storify-fetch-error'] ) ? sanitize_key( $_GET['storify-fetch-error'] ) : false;
+
+		// Start my switch.
+		switch ( $error ) {
+
+			case 'missing_username' :
+				$errmsg = __( 'There was no username provided.', 'storify-story-import' );
+				break;
+
+			case 'no_user_content' :
+				$errmsg = __( 'There was no content returned by the Storify API for this user.', 'storify-story-import' );
+				break;
+
+			case 'no_user_stories' :
+				$errmsg = __( 'There was no stories returned by the Storify API for this user.', 'storify-story-import' );
+				break;
+
+			case 'no_user_story_data' :
+				$errmsg = __( 'The requested stories had no data returned by the Storify API for this user.', 'storify-story-import' );
+				break;
+
+			case 'no_user_story_create' :
+				$errmsg = __( 'Stories could not be created based on the provided data for this user.', 'storify-story-import' );
+				break;
+
+			case 'missing_single_url' :
+				$errmsg = __( 'The URL for a story was not provided.', 'storify-story-import' );
+				break;
+
+			case 'invalid_single_url' :
+				$errmsg = __( 'The URL for a story was invalid or otherwise malformed.', 'storify-story-import' );
+				break;
+
+			case 'no_single_story_content' :
+				$errmsg = __( 'There was no content returned by the Storify API for this story.', 'storify-story-import' );
+				break;
+
+			case 'no_single_story_elements' :
+				$errmsg = __( 'There were no elements returned by the Storify API for this story.', 'storify-story-import' );
+				break;
+
+			case 'no_single_story_data' :
+				$errmsg = __( 'The data for this story could not be properly formatted.', 'storify-story-import' );
+				break;
+
+			case 'no_single_story_create' :
+				$errmsg = __( 'This story could not be created based on the provided data.', 'storify-story-import' );
+				break;
+
+			case 'missing_story_id' :
+				$errmsg = __( 'No post ID was provided for this story.', 'storify-story-import' );
+				break;
+
+			case 'invalid_story_id' :
+				$errmsg = __( 'The post ID provided is invalid.', 'storify-story-import' );
+				break;
+
+			case 'missing_story_slug' :
+				$errmsg = __( 'The requested story has no saved Storify username.', 'storify-story-import' );
+				break;
+
+			case 'no_single_elements_data' :
+				$errmsg = __( 'There were no data elements returned by the Storify API for this story.', 'storify-story-import' );
+				break;
+
+			case 'no_single_elements_create' :
+				$errmsg = __( 'This story could not be updated based on the provided data.', 'storify-story-import' );
+				break;
+
+			default :
+				$errmsg = __( 'There was an error with your request.', 'storify-story-import' );
+
+			// End all case breaks.
+		}
+
+		// And the actual message.
+		echo '<div class="notice notice-error is-dismissible storify-fetch-result-message">';
+				echo '<p>' . esc_html( $errmsg ) . '</p>';
+		echo '</div>';
+
+		// And bail.
+		return;
 	}
 
 	/**
@@ -198,7 +308,7 @@ class StorifyStoryImport_Admin {
 		$label  = empty( $check ) ? __( 'Fetch Elements', 'storify-story-import' ) : __( 'Update Elements', 'storify-story-import' );
 
 		// First make the link.
-		$link   = add_query_arg( array( 'post_type' => 'storify-stories', 'storify-posts-trigger' => 1, 'fetch-action' => 'fetch-elements', 'fetch-id' => $post->ID ), admin_url( 'edit.php' ) );
+		$link   = add_query_arg( array( 'post_type' => 'storify-stories', 'storify-elements-trigger' => 1, 'fetch-id' => $post->ID ), admin_url( 'edit.php' ) );
 
 		// Return the string or the markup.
 		$actions['storify'] = '<a title="' . esc_attr( $label ) . '" href="' . esc_url( $link ) . '">' . esc_html( $label ) . '</a>';

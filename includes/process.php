@@ -39,28 +39,30 @@ class StorifyStoryImport_Process {
 			$user   = ! empty( $_POST['fetch-user-field'] ) ? sanitize_text_field( $_POST['fetch-user-field'] ) : '';
 			$single = ! empty( $_POST['fetch-single-field'] ) ? sanitize_text_field( $_POST['fetch-single-field'] ) : '';
 
+			// @@todo add the nonce check
+
 			// Handle my user fetching.
-			if ( ! empty( $user ) && 'fetch-user' === esc_attr( $action ) ) {
+			if ( 'fetch-user' === esc_attr( $action ) ) {
 				self::fetch_user_stories( $user );
 			}
 
 			// Handle my single fetching.
-			if ( ! empty( $single ) && 'fetch-single' === esc_attr( $action ) ) {
+			if ( 'fetch-single' === esc_attr( $action ) ) {
 				self::fetch_single_story( $single );
 			}
 
 		}
 
 		// Our trigger from the posts page.
-		if ( ! empty( $_GET['storify-posts-trigger'] ) ) {
+		if ( ! empty( $_GET['storify-elements-trigger'] ) ) {
 
 			// preprint( $_GET, true );
 
-			// Handle my elements fetching.
-			if ( ! empty( $_GET['fetch-action'] ) && ! empty( $_GET['fetch-id'] ) && 'fetch-elements' === $_GET['fetch-action'] ) {
-				self::fetch_story_elements( $_GET['fetch-id'] );
-			}
+			// Parse out my ID.
+			$id = ! empty( $_GET['fetch-id'] ) ? absint( $_GET['fetch-id'] ) : 0;
 
+			// Handle my elements fetching.
+			self::fetch_story_elements( $id );
 		}
 	}
 
@@ -73,37 +75,44 @@ class StorifyStoryImport_Process {
 	 */
 	public static function fetch_user_stories( $user = '' ) {
 
+		// Bail with no single user.
+		if ( empty( $user ) ) {
+			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'missing_username' ) );
+		}
+
 		// Fetch our items.
-		$call   = self::make_api_call( 'stories/' . $user );
+		$call   = storify_story_import()->make_api_call( 'stories/' . $user );
 
 		// preprint( $call, true );
 
 		// Bail with no request data.
 		if ( empty( $call ) || empty( $call['content'] ) ) {
-			wp_die( 'No content', 'Data error' ); // Need some real error returns.
+			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_user_content' ) );
 		}
+
+		// preprint( $call['content'], true );
 
 		// Bail with no stories.
 		if ( empty( $call['content']['stories'] ) ) {
-			wp_die( 'No stories', 'Data error' ); // Need some real error returns.
+			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_user_stories' ) );
 		}
+
+		// preprint( $call['content']['stories'], true );
 
 		// Parse my list.
 		if ( false === $stories = StorifyStoryImport_Helper::parse_story_list( $call['content']['stories'] ) ) {
-			wp_die( 'No story data', 'Data error' ); // Need some real error returns.
+			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_user_story_data' ) );
 		}
+
+		// preprint( $stories, true );
 
 		// Run the creation.
 		if ( false === $create = self::process_user_stories( $stories, $user ) ) {
-			wp_die( 'No story created', 'Data error' ); // Need some real error returns.
+			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_user_story_create' ) );
 		}
 
-		// First make the link.
-		$link   = add_query_arg( array( 'post_type' => 'storify-stories', 'page' => 'storify-import-settings', 'fetch-completed' => 1  ), admin_url( 'edit.php' ) );
-
-		// Redirect and exit.
-		wp_redirect( $link );
-		exit();
+		// Process the admin redirect.
+		storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings' ), false );
 	}
 
 	/**
@@ -115,42 +124,52 @@ class StorifyStoryImport_Process {
 	 */
 	public static function fetch_single_story( $single = '' ) {
 
+		// Bail with no single URL.
+		if ( empty( $single ) ) {
+			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'missing_single_url' ) );
+		}
+
 		// Get the path parsed out for the API call.
 		$parsed = parse_url( $single, PHP_URL_PATH );
 
+		// preprint( $parsed, true );
+
+		// Bail with no single URL.
+		if ( empty( $parsed ) ) {
+			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'invalid_single_url' ) );
+		}
+
 		// Fetch our items.
-		$call   = self::make_api_call( 'stories' . $parsed );
+		$call   = storify_story_import()->make_api_call( 'stories' . $parsed );
 
 		// preprint( $call, true );
 
 		// Bail with no request data.
 		if ( empty( $call ) || empty( $call['content'] ) ) {
-			wp_die( 'No element content', 'Data error' ); // Need some real error returns.
+			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_single_story_content' ) );
 		}
 
-		// Bail with no stories.
-		if ( empty( $call['content']['elements'] ) ) {
-			wp_die( 'No elements', 'Data error' ); // Need some real error returns.
-		}
-
-		preprint( $call['content']['elements'], true );
+		// unset( $call['content']['stats'] );
+		// preprint( $call['content'], true );
+		// preprint( array( $call['content'] ), true );
 
 		// Parse my list.
-		if ( false === $stories = StorifyStoryImport_Helper::parse_story_list( $call['content']['stories'] ) ) {
-			wp_die( 'No story data', 'Data error' ); // Need some real error returns.
+		if ( false === $stories = StorifyStoryImport_Helper::parse_story_list( array( $call['content'] ) ) ) {
+			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_single_story_data' ) );
 		}
+
+		// preprint( $stories, true );
+
+		// Parse out the username.
+		$user   = $call['content']['author']['username'];
 
 		// Run the creation.
 		if ( false === $create = self::process_user_stories( $stories, $user ) ) {
-			wp_die( 'No story created', 'Data error' ); // Need some real error returns.
+			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_single_story_create' ) );
 		}
 
-		// First make the link.
-		$link   = add_query_arg( array( 'post_type' => 'storify-stories', 'page' => 'storify-import-settings', 'fetch-completed' => 1  ), admin_url( 'edit.php' ) );
-
-		// Redirect and exit.
-		wp_redirect( $link );
-		exit();
+		// Process the admin redirect.
+		storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings' ), false );
 	}
 
 	/**
@@ -162,66 +181,63 @@ class StorifyStoryImport_Process {
 	 */
 	public static function fetch_story_elements( $post_id = 0 ) {
 
+		// Bail with no post ID.
+		if ( empty( $post_id ) ) {
+			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'missing_story_id' ) );
+		}
+
+		// Bail on an invalid post type.
+		if ( 'storify-stories' !== get_post_type( $post_id ) ) {
+			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'invalid_story_id' ) );
+		}
+
 		// Get our meta items.
 		$user   = get_post_meta( $post_id, '_storify_username', true );
 		$slug   = get_post_meta( $post_id, '_storify_slug', true );
 
-		// Fetch our items.
-		$call   = self::make_api_call( 'stories/' . $user . '/' . $slug );
+		// Bail on a missing username.
+		if ( empty( $user ) ) {
+			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'missing_username' ) );
+		}
 
-		// preprint( $items, true );
+		// Bail on a missing story slug.
+		if ( empty( $slug ) ) {
+			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'missing_story_slug' ) );
+		}
+
+		// Fetch our items.
+		$call   = storify_story_import()->make_api_call( 'stories/' . $user . '/' . $slug );
+
+		// preprint( $call, true );
 
 		// Bail with no request data.
 		if ( empty( $call ) || empty( $call['content'] ) ) {
-			wp_die( 'No element content', 'Data error' ); // Need some real error returns.
+			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'no_single_story_content' ) );
 		}
+
+		// preprint( $call['content'], true );
 
 		// Bail with no stories.
 		if ( empty( $call['content']['elements'] ) ) {
-			wp_die( 'No elements', 'Data error' ); // Need some real error returns.
+			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'no_single_story_elements' ) );
 		}
+
+		// preprint( $call['content']['elements'], true );
 
 		// Parse my list.
 		if ( false === $elements = StorifyStoryImport_Helper::parse_element_list( $call['content']['elements'], $post_id ) ) {
-			wp_die( 'No elements data', 'Data error' ); // Need some real error returns.
+			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'no_single_elements_data' ) );
 		}
+
+		// preprint( $elements, true );
 
 		// Run the creation.
 		if ( false === $create = self::process_story_elements( $elements, $post_id ) ) {
-			wp_die( 'No elements created', 'Data error' ); // Need some real error returns.
+			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'no_single_elements_data' ) );
 		}
 
-		// First make the link.
-		$link   = add_query_arg( array( 'post_type' => 'storify-stories', 'fetch-completed' => 1  ), admin_url( 'edit.php' ) );
-
-		// Redirect and exit.
-		wp_redirect( $link );
-		exit();
-	}
-
-	/**
-	 * Run our API call to Storify.
-	 *
-	 * @param  string $endpoint  The endpoint of the API we are going to.
-	 *
-	 * @return mixed
-	 */
-	public static function make_api_call( $endpoint = '' ) {
-
-		// Set my URL.
-		$url   = 'http://api.storify.com/v1/' . $endpoint;
-
-		// Set my args.
-		$args = array( 'per_page' => 50 );
-
-		// Make the API call.
-		$call = wp_remote_get( $url, $args );
-
-		// Pull the guts.
-		$guts = wp_remote_retrieve_body( $call );
-
-		// Return my stuff.
-		return json_decode( $guts, true );
+		// Process the admin redirect.
+		storify_story_import()->admin_redirect( null, false );
 	}
 
 	/**
@@ -260,33 +276,12 @@ class StorifyStoryImport_Process {
 	 */
 	public static function create_single_story( $story = array(), $user = '' ) {
 
-		// Check my status.
-		$status = 'published' === $story['status'] ? 'publish' : 'draft';
-
 		// Set my meta array args.
-		$meta   = array(
-			'_storify_sid'         => esc_attr( $story['sid'] ),
-			'_storify_created'     => esc_attr( $story['created'] ),
-			'_storify_published'   => esc_attr( $story['published'] ),
-			'_storify_username'    => esc_attr( $user ),
-			'_storify_slug'        => esc_attr( $story['slug'] ),
-			'_storify_insert_date' => current_time( 'timestamp' ),
-			'_storify_elements'    => false,
-		);
+		$format = array( '_storify_username' => esc_attr( $user ), '_storify_insert_date' => current_time( 'timestamp' ), '_storify_elements' => false );
+		$meta   = StorifyStoryImport_Helper::format_single_story_meta( $format, $story );
 
-		// Build the args.
-		$setup  = array(
-			'post_title'      => $story['title'],
-			'post_name'       => $story['slug'],
-			'post_excerpt'    => $story['description'],
-			'post_date'       => date( 'Y-m-d H:i:s', $story['published'] ),
-			'post_status'     => $status,
-			'post_author'     => get_current_user_id(),
-			'post_type'       => 'storify-stories',
-			'comment_status'  => 'closed',
-			'ping_status'     => 'closed',
-			'meta_input'      => $meta,
-		);
+		// Build the args, including the current user ID.
+		$setup  = StorifyStoryImport_Helper::format_single_story_setup( array( 'post_author' => get_current_user_id() ), $story, $meta );
 
 		// Insert it.
 		$insert = wp_insert_post( $setup );
@@ -311,31 +306,12 @@ class StorifyStoryImport_Process {
 	 */
 	public static function update_single_story( $post_id = 0, $story = array(), $user = '' ) {
 
-		// Check my status.
-		$status = 'published' === $story['status'] ? 'publish' : 'draft';
-
 		// Set my meta array args.
-		$meta   = array(
-			'_storify_sid'         => esc_attr( $story['sid'] ),
-			'_storify_created'     => esc_attr( $story['created'] ),
-			'_storify_published'   => esc_attr( $story['published'] ),
-			'_storify_username'    => esc_attr( $user ),
-			'_storify_slug'        => esc_attr( $story['slug'] ),
-			'_storify_update_date' => current_time( 'timestamp' ),
-		);
+		$format = array( '_storify_username' => esc_attr( $user ), '_storify_update_date' => current_time( 'timestamp' ) );
+		$meta   = StorifyStoryImport_Helper::format_single_story_meta( $format, $story );
 
-		// Build the args.
-		$setup  = array(
-			'ID'              => absint( $post_id ),
-			'post_title'      => $story['title'],
-			'post_name'       => $story['slug'],
-			'post_excerpt'    => $story['description'],
-			'post_date'       => date( 'Y-m-d H:i:s', $story['published'] ),
-			'post_status'     => $status,
-			'comment_status'  => 'closed',
-			'ping_status'     => 'closed',
-			'meta_input'      => $meta,
-		);
+		// Build the args, adding the post ID so we can update it.
+		$setup  = StorifyStoryImport_Helper::format_single_story_setup( array( 'ID' => absint( $post_id ) ), $story, $meta );
 
 		// Update it.
 		$update = wp_update_post( $setup );
@@ -375,7 +351,7 @@ class StorifyStoryImport_Process {
 		}
 
 		// Update my elements flag.
-		update_post_meta( $post_id, '_storify_elements', true );
+		update_post_meta( $post_id, '_storify_elements', count( $elements ) );
 
 		// And return true.
 		return true;
@@ -390,7 +366,7 @@ class StorifyStoryImport_Process {
 	 *
 	 * @return void
 	 */
-	public static function create_single_element( $post_id = 0, $element = array(), $user ) {
+	public static function create_single_element( $element = array(), $post_id = 0, $user ) {
 
 		// Setup my args.
 		$setup  = array(
@@ -435,7 +411,7 @@ class StorifyStoryImport_Process {
 	 *
 	 * @return void
 	 */
-	public static function update_single_element( $comment_id = 0, $post_id = 0, $element = array(), $user ) {
+	public static function update_single_element( $comment_id = 0, $element = array(), $post_id = 0, $user ) {
 
 		// Setup my args.
 		$setup  = array(

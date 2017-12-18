@@ -68,6 +68,64 @@ class StorifyStoryImport_Helper {
 	}
 
 	/**
+	 * Format the post args array before we insert or update a story.
+	 *
+	 * @param  array $args   Any additional args to add.
+	 * @param  array $story  The base story to get our data from.
+	 *
+	 * @return array
+	 */
+	public static function format_single_story_setup( $args = array(), $story = array(), $meta = array() ) {
+
+		// Check my status.
+		$status = 'published' === $story['status'] ? 'publish' : 'draft';
+
+		// Build the args.
+		$base   = array(
+			'post_title'      => $story['title'],
+			'post_name'       => $story['slug'],
+			'post_excerpt'    => $story['description'],
+			'post_date'       => date( 'Y-m-d H:i:s', $story['published'] ),
+			'post_status'     => $status,
+			'post_type'       => 'storify-stories',
+			'comment_status'  => 'closed',
+			'ping_status'     => 'closed',
+			'meta_input'      => $meta,
+		);
+
+		// Merge our formatted array.
+		$setup   = ! empty( $args ) ? wp_parse_args( $args, $base ) : $base;
+
+		// Return our array with a filter.
+		return apply_filters( 'storify_story_import_story_setup', $setup );
+	}
+
+	/**
+	 * Format the meta array before we insert or update a story.
+	 *
+	 * @param  array $args   Any additional meta to add.
+	 * @param  array $story  The base story to get our data from.
+	 *
+	 * @return array
+	 */
+	public static function format_single_story_meta( $args = array(), $story = array() ) {
+
+		// Set my base meta array args.
+		$base   = array(
+			'_storify_sid'         => esc_attr( $story['sid'] ),
+			'_storify_created'     => esc_attr( $story['created'] ),
+			'_storify_published'   => esc_attr( $story['published'] ),
+			'_storify_slug'        => esc_attr( $story['slug'] ),
+		);
+
+		// Merge our formatted array.
+		$meta   = ! empty( $args ) ? wp_parse_args( $args, $base ) : $base;
+
+		// Return our array with a filter.
+		return apply_filters( 'storify_story_import_story_meta', $meta );
+	}
+
+	/**
 	 * Check to see if the element (comment) already exists.
 	 *
 	 * @param  string $id  The original ID from Storify that we kept.
@@ -198,18 +256,6 @@ class StorifyStoryImport_Helper {
 
 		// Return my data.
 		return $data;
-	}
-
-	/**
-	 * Take our full Storify URL and get my parts.
-	 *
-	 * @param  string $single  The single URL.
-	 *
-	 * @return string
-	 */
-	public static function parse_single_url( $single = '' ) {
-
-		$parse = parse_url( $single, PHP_URL_PATH );
 	}
 
 	// End our class.
