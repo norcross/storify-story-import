@@ -42,7 +42,10 @@ class StorifyStoryImport_Admin {
 	 */
 	public function exclude_comment_list( $query ) {
 
-		// preprint( $query->query_vars );
+		// If I'm looking for the elements, don't stomp it.
+		if ( ! empty( $query->query_vars['type'] ) && 'storify-element' === esc_attr( $query->query_vars['type'] ) ) {
+			return $query;
+		}
 
 		// Remove the story-element type unless bypassed.
 		if ( false !== apply_filters( 'storify_story_import_exclude_comments', true, $query ) ) {
@@ -70,9 +73,37 @@ class StorifyStoryImport_Admin {
 		// If it worked, handle it quickly.
 		if ( ! empty( $_GET['storify-fetch-result'] ) && 'success' === sanitize_key( $_GET['storify-fetch-result'] ) ) {
 
+			// Determine my fetch type.
+			$ftype  = ! empty( $_GET['storify-fetch-type'] ) ? sanitize_key( $_GET['storify-fetch-type'] ) : false;
+
+			// Start my switch.
+			switch ( $ftype ) {
+
+				case 'users' :
+					$text   = __( 'Success! The available Storify stories for this user have been imported.', 'storify-story-import' );
+					break;
+
+				case 'single' :
+					$text   = __( 'Success! The individual Storify story has been imported.', 'storify-story-import' );
+					break;
+
+				case 'elements' :
+					$text   = __( 'Success! The elements for this Storify story have been imported.', 'storify-story-import' );
+					break;
+
+				case 'settings' :
+					$text   = __( 'Your settings have been saved.', 'storify-story-import' );
+					break;
+
+				default :
+					$text   = __( 'The requested Storify data has been successfully imported!', 'storify-story-import' );
+
+				// End all case breaks.
+			}
+
 			// And handle the notice.
 			echo '<div class="notice notice-success is-dismissible storify-fetch-result-message">';
-				echo '<p>' . esc_html__( 'The requested Storify data has been successfully imported!', 'storify-story-import' ) . '</p>';
+				echo '<p>' . esc_html( $text ) . '</p>';
 			echo '</div>';
 
 			// Then be done.
@@ -161,7 +192,7 @@ class StorifyStoryImport_Admin {
 
 		// And the actual message.
 		echo '<div class="notice notice-error is-dismissible storify-fetch-result-message">';
-				echo '<p>' . esc_html( $errmsg ) . '</p>';
+			echo '<p>' . esc_html( $errmsg ) . '</p>';
 		echo '</div>';
 
 		// And bail.
@@ -199,7 +230,7 @@ class StorifyStoryImport_Admin {
 	 */
 	public function settings_menu() {
 
-		// Now add back our settings page.
+		// Add the submenu page onto the post type.
 		add_submenu_page( self::$root_slug, __( 'Storify Data Import', 'storify-story-import' ), __( 'Data Import', 'storify-story-import' ), apply_filters( 'storify_story_import_menu_item_cap', 'manage_options' ), self::$menu_slug, array( __class__, 'settings_page' ) );
 	}
 
@@ -213,11 +244,27 @@ class StorifyStoryImport_Admin {
 		// Set a fields array.
 		$fields = self::get_fields();
 
+		// Set the field args for the settings.
+		/*
+		$dargs  = array(
+			'label' => __( 'Display Type', 'storify-story-import' ),
+			'desc'  => __( 'Select how you would like your story elements to be displayed.', 'storify-story-import' ),
+			'curr'  => StorifyStoryImport_Helper::get_single_setting( 'storify_display_type', null, 'embed' ),
+			'items' => array(
+				'embed'    => __( 'Embed Comments', 'storify-story-import' ),
+				'content'  => __( 'Post Content', 'storify-story-import' ),
+			),
+		);
+		*/
+
 		// Handle the form wrap.
 		echo '<div class="wrap storify-import-wrap">';
 
 			// Output the title.
 			echo '<h1>' . get_admin_page_title() . '</h1>';
+
+			// Set a div around each the fields.
+			echo '<div class="storify-import-section storify-import-fields-section">';
 
 			// Loop the fields.
 			foreach ( $fields as $action => $args ) {
@@ -234,6 +281,27 @@ class StorifyStoryImport_Admin {
 				echo '</form>';
 			}
 
+			// Close the div.
+			echo '</div>';
+			/*
+			// Set a div around the settings.
+			echo '<div class="storify-import-section storify-import-settings-section">';
+
+				// Include a title.
+				echo '<h3 class="storify-import-section-title">' . esc_html__( 'Display Settings', 'storify-story-import' ) . '</h3>';
+
+				// Now include the setting whether to use oembed or parse it out.
+				echo '<form method="post" action="' . menu_page_url( self::$menu_slug, 0 ) . '">';
+
+					// And our lovely fields.
+					echo self::fetch_setting_fields( $dargs );
+
+				// Close the form.
+				echo '</form>';
+
+			// Close the div.
+			echo '</div>';
+			*/
 		// And the entire div.
 		echo '</div>';
 	}
@@ -269,6 +337,8 @@ class StorifyStoryImport_Admin {
 	/**
 	 * Create our combo text and button field.
 	 *
+	 * @param  string  $action  What the button action is.
+	 * @param  array   $args    The individual field args.
 	 * @param  boolean $echo    Whether to echo it out or not.
 	 *
 	 * @return HTML
@@ -300,6 +370,73 @@ class StorifyStoryImport_Admin {
 
 		// Close it up.
 		$field .= '</p>';
+
+		// Echo if requested.
+		if ( ! empty( $echo ) ) {
+			echo $field;
+		}
+
+		// Just return it.
+		return $field;
+	}
+
+	/**
+	 * Get our settings groups.
+	 *
+	 * @param  array   $args     The individual field args.
+	 * @param  string  $name     The field name.
+	 * @param  boolean $echo     Whether to echo it out or not.
+	 *
+	 * @return HTML
+	 */
+	public static function fetch_setting_fields( $args = array(), $name = 'storify-display-type', $echo = false ) {
+
+		// preprint( $args, true );
+
+		// Set an empty.
+		$field  = '';
+
+		// Open it up.
+		$field .= '<p class="storify-import-field-wrapper ' . esc_attr( $name ) . '-field-wrapper">';
+
+			// Add the label.
+			$field .= '<span class="storify-import-label">' . esc_html( $args['label'] ) . '</span>';
+
+			// Add the radio inputs.
+			$field .= '<span class="storify-import-field storify-import-settings-radio">';
+
+			// Now loop my individual items.
+			foreach ( $args['items'] as $value => $label ) {
+
+				// Handle the label.
+				$field .= '<label class="storify-import-settings-radio-label" for="' . esc_attr( $name ) . '-' . esc_attr( $value ) . '">';
+
+					// Our radio input field.
+					$field .= '<input class="storify-import-settings-radio-field" id="' . esc_attr( $name ) . '-' . esc_attr( $value ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( $value ) . '" type="radio" ' . checked( $value, $args['curr'], false ) . '>';
+
+				// Close the text with the label.
+				$field .= esc_html( $label ) . '</label>';
+			}
+
+			// Close the radio inputs.
+			$field .= '</span>';
+
+			// And some text.
+			if ( ! empty( $args['desc'] ) ) {
+				$field .= '<span class="description storify-import-description">' . esc_html( $args['desc'] ) . '</span>';
+			}
+
+			// And a nonce.
+			$field .= wp_nonce_field( 'fetch-settings-action', 'fetch-settings-nonce', false, false );
+
+		// Close it up.
+		$field .= '</p>';
+
+		// The button to save the settings.
+		$field .= '<button id="fetch-action-settings" name="fetch-action" class="storify-import-button button button-small button-primary" value="settings" type="submit">' . esc_html__( 'Save Settings', 'storify-story-import' ) . '</button>';
+
+		// And a quick hidden field to trigger it all.
+		$field .= '<input type="hidden" name="storify-settings-trigger" value="1">';
 
 		// Echo if requested.
 		if ( ! empty( $echo ) ) {

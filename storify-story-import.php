@@ -290,6 +290,160 @@ final class StorifyStoryImport {
 		return json_decode( $guts, true );
 	}
 
+	/**
+	 * Get my elements tied to a story.
+	 *
+	 * @param  integer $story_id  The story ID we are pulling from.
+	 *
+	 * @return array
+	 */
+	/**
+	 * Get my elements tied to a story.
+	 *
+	 * @param  integer $story_id  The story ID we are pulling from.
+	 * @param  boolean $parsed    Whether or not to parse the data.
+	 *
+	 * @return array
+	 */
+	public function get_story_elements( $story_id = 0, $parsed = true ) {
+
+		// Bail without a post ID or wrong type.
+		if ( empty( $story_id ) || 'storify-stories' !== get_post_type( $story_id ) ) {
+			return false;
+		}
+
+		// Make our transient key.
+		$key    = 'storify_story_elements_' . absint( $story_id );
+
+		// If we don't want the cache'd version, delete the transient first.
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			delete_transient( $key );
+		}
+
+		// Check the transient.
+		if ( false === $data = get_transient( $key )  ) {
+
+			// Setup my comment args.
+			$setup  = array(
+				'post_id' => absint( $story_id ),
+				'type'    => 'storify-element',
+				'order'   => 'ASC',
+				'orderby' => 'comment_date'
+			);
+
+			// And fetch the elements.
+			$data   = get_comments( $setup );
+
+			// Bail if the user doesn't exist.
+			if ( empty( $data ) || is_wp_error( $data ) ) {
+				return false;
+			}
+
+			// Set our transient with our data.
+			set_transient( $key, $data, WEEK_IN_SECONDS );
+		}
+
+		// and return the whole thing.
+		return ! empty( $parsed ) ? StorifyStoryImport_Helper::parse_element_display( $data ) : $data;
+	}
+
+	/**
+	 * Build out the display markup. Can be used to embed or build content.
+	 *
+	 * @param  integer $story_id  The ID of the story.
+	 *
+	 * @return HTML
+	 */
+	public function build_display_markup( $story_id = 0 ) {
+
+		// Bail without a post ID or wrong type.
+		if ( empty( $story_id ) || 'storify-stories' !== get_post_type( $story_id ) ) {
+			return false;
+		}
+
+		// Fetch my items, parsed.
+		if ( false === $parsed = storify_story_import()->get_story_elements( $story_id ) ) {
+			return false;
+		}
+
+		/*
+		// Make our transient key.
+		$key    = 'storify_story_embed_' . absint( $story_id );
+
+		// If we don't want the cache'd version, delete the transient first.
+		if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+			delete_transient( $key );
+		}
+
+		// Check the transient.
+		if ( false === $build = get_transient( $key )  ) {
+
+			// Set our transient with our data.
+			set_transient( $key, $build, WEEK_IN_SECONDS );
+		}
+		*/
+
+		// Set an empty.
+		$build  = '';
+
+		// Set a simple counter.
+		$i = 0;
+
+		// Loop and display.
+		foreach ( $parsed as $element ) {
+
+			// Check for the source and type.
+			$type   = ! empty( $element['type'] ) ? $element['type'] : '';
+			$source = ! empty( $element['source'] ) ? $element['source'] : '';
+
+			// Start my switch.
+			switch ( $source ) {
+
+				// Handle our twitter links.
+				case 'twitter' :
+					$embed  = wp_oembed_get( $element['link'], array( 'omit_script' => true, 'hide_thread' => true, 'conversation' => 'no' ) );
+					break;
+
+				// Handle our Flickr and YouTube links.
+				case 'flickr' :
+				case 'youtube' :
+					$embed  = wp_oembed_get( $element['link'] );
+					break;
+
+				default :
+					$embed  = StorifyStoryImport_Display::display_generic_element( $type, $element );
+
+				// End all case breaks.
+			}
+
+			// And filter it.
+			$embed  = apply_filters( 'storify_story_import_display_embed', $embed, $element, $story_id );
+
+			// Skip if I have no embed to use.
+			if ( empty( $embed ) ) {
+				continue;
+			}
+
+			// And the build.
+			$build .= '<div id="single-storify-element-' . absint( $i ) . '" class="single-storify-element">';
+			$build .= $embed;
+			$build .= '<p><a href="' . $element['link'] . '">Link</a></p>';
+			$build .= '</div>';
+
+			// Increment the counter.
+			$i++;
+		}
+
+		// Adding the twitter JS file for embedding.
+		// Notes: https://dev.twitter.com/web/embedded-tweets
+		$build .= '<div class="storify-twitter-embed-js">';
+			$build .= '<script async="" src="' . esc_url( 'https://platform.twitter.com/widgets.js' ) . '" charset="utf-8"></script></p>';
+		$build .= '</div>';
+
+		// And return my build.
+		return $build;
+	}
+
 	// End our class.
 }
 
@@ -309,6 +463,27 @@ function storify_story_import() {
 	return StorifyStoryImport::instance();
 }
 storify_story_import();
+
+
+
+/**
+ * Our inital setup function when activated.
+ *
+ * @return void
+ */
+function storify_story_import_install() {
+
+	// Set our installed option flag.
+	add_option( 'storify_display_type', 'embed', '', false );
+
+	// Include our action so that we may add to this later.
+	do_action( 'storify_story_import_install' );
+
+	// And flush our rewrite rules.
+	flush_rewrite_rules();
+}
+register_activation_hook( STORIFY_STORY_IMPORT_FILE, 'storify_story_import_install' );
+
 
 // Only for debugging as we build this out.
 if ( ! function_exists( 'preprint' ) ) {

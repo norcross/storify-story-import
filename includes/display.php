@@ -18,8 +18,75 @@ class StorifyStoryImport_Display {
 	 * @return void
 	 */
 	public function init() {
+
+		// If we don't have the embed type turned on, bail.
+		/*
+		if ( 'embed' !== $embed = StorifyStoryImport_Helper::get_single_setting( 'storify_display_type', null, 'embed' ) ) {
+			return;
+		}
+		*/
+
+		// Load the filters.
+		add_filter( 'oembed_fetch_url',                 array( $this, 'add_oembed_args'     ),  10, 3   );
 		add_filter( 'the_content',                      array( $this, 'display_thread'      ),  10, 2   );
-		add_filter( 'oembed_fetch_url',                 array( $this, 'add_twitter_args'    ),  10, 3   );
+	}
+
+	/**
+	 * Add the handler for not including the reply.
+	 *
+	 * @param string $provider  The oembed provider
+	 * @param string $url       The URL we are trying to embed.
+	 * @param mixed  $args      Whatever args we passed.
+	 */
+	public function add_oembed_args( $provider, $url, $args ) {
+
+		// Set an empty.
+		$items  = array();
+
+		// Only run this on twitter links.
+		if ( strpos( $provider, 'twitter.com' ) !== false ) {
+
+			// Set my possible new args.
+			// List of args for a single Tweet: https://developer.twitter.com/en/docs/tweets/post-and-engage/api-reference/get-statuses-oembed
+			$items  = array(
+				'lang',
+				'theme',
+				'align',
+				'hide_thread',
+				'widget_type',
+				'omit_script',
+			);
+		}
+
+		// Only run this on Youtube links.
+		if ( strpos( $provider, 'youtube' ) !== false ) {
+
+			// Set my possible new args.
+			// List of args for a single Tweet: https://developers.google.com/youtube/player_parameters
+			$items  = array(
+				'autoplay',
+				'controls',
+				'loop',
+			);
+		}
+
+		// Just return my provider if I have no args.
+		if ( empty( $items ) ) {
+			return $provider;
+		}
+
+		// Now loop my custom items and add them.
+		foreach ( $items as $item ) {
+
+			// Add the arg if present.
+			if ( isset( $args[ $item ] ) ) {
+				$provider = add_query_arg( $item, $args[ $item ], $provider );
+			}
+
+		}
+
+		// Return my provider.
+		return $provider;
 	}
 
 	/**
@@ -36,80 +103,48 @@ class StorifyStoryImport_Display {
 			return $content;
 		}
 
-		// Setup my comment args.
-		$setup  = array(
-			'post_id' => get_the_ID(),
-			'type'    => 'storify-element',
-			'order'   => 'ASC',
-			'orderby' => 'comment_date'
-		);
+		// Set my story ID.
+		$embed  = storify_story_import()->build_display_markup( get_the_ID() );
 
-		// Fetch my items.
-		$fetch  = get_comments( $setup );
-
-		// preprint( $fetch, true );
-
-		// Parse it.
-		$items  = StorifyStoryImport_Helper::parse_element_display( $fetch );
-
-		// preprint( $items, true );
-
-		// Set an empty.
-		$build  = '';
-
-		// Loop and display.
-		foreach ( $items as $item ) {
-
-			// Handle our twitter links.
-			if ( 'twitter' === $item['source'] ) {
-				$embed  = wp_oembed_get( $item['link'], array( 'hide_thread' => true, 'conversation' => 'no' ) );
-			}
-
-			// And the build.
-			$build .= '<div>';
-			$build .= $embed;
-			$build .= '<p><a href="' . $item['link'] . '">Link</a></p>';
-			$build .= '</div>';
-		}
+		// Update the body.
+		// StorifyStoryImport_Helper::update_story_content( $story, $build );
 
 		// Return our build.
-		return $content . $build;
+		return $content . $embed;
 	}
 
 	/**
-	 * Add the handler for not including the reply.
+	 * Handle our generic display.
 	 *
-	 * @param string $provider  The oembed provider
-	 * @param string $url       The URL we are trying to embed.
-	 * @param mixed  $args      Whatever args we passed.
+	 * @param  string $type     What type of element it is.
+	 * @param  array  $element  The entire element.
+	 *
+	 * @return HTML
 	 */
-	public function add_twitter_args( $provider, $url, $args ) {
+	public static function display_generic_element( $type = '', $element = array() ) {
 
-		// Only run this on twitter links.
-		if ( strpos( $provider, 'twitter.com' ) !== false ) {
+		// Start my empty.
+		$setup  = '';
 
-			// Set my possible new args.
-			$items  = array(
-				'lang',
-				'theme',
-				'align',
-				'hide_thread',
-				'widget_type'
-			);
+		// Start my switch.
+		switch ( $type ) {
 
-			// List of args for a single Tweet: https://dev.twitter.com/rest/reference/get/statuses/oembed
-			foreach ( $items as $item ) {
+			// Handle our images.
+			case 'image' :
+				$setup .= '<img src="' . esc_url( $element['link'] ) . ' />';
+				break;
 
-				// Add the arg if present.
-				if ( isset( $args[ $item ] ) ) {
-					$provider = add_query_arg( $item, $args[ $item ], $provider );
-				}
+			// Handle our basic link.
+			case 'link' :
+				$setup .= ! empty( $element['title'] ) ? '<h4>' . esc_html( $element['title'] ) . '</h4>' : '';
+				$setup .= ! empty( $element['text'] ) ? wpautop( wp_kses_post( $element['text'] ) ) : '';
+				break;
 
-			}
+			// End all case breaks.
 		}
 
-		// Return my provider.
-		return $provider;
+		// And an empty return.
+		return apply_filters( 'storify_story_import_display_generic', $setup, $type, $element );
 	}
 
 	// End our class.

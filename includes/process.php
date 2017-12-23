@@ -29,7 +29,9 @@ class StorifyStoryImport_Process {
 	 */
 	public function run_storify_request() {
 
-		// Our trigger from the settings page.
+		// preprint( $_POST, true );
+
+		// Our trigger from the settings page to run an import.
 		if ( ! empty( $_POST['storify-import-trigger'] ) ) {
 
 			// preprint( $_POST, true );
@@ -50,6 +52,23 @@ class StorifyStoryImport_Process {
 			if ( 'single' === esc_attr( $action ) ) {
 				self::fetch_single_story( $single );
 			}
+		}
+
+		// Our trigger from the settings page to save.
+		if ( ! empty( $_POST['storify-settings-trigger'] ) ) {
+
+			// preprint( $_POST, true );
+
+			// Set some variables.
+			$dtype  = ! empty( $_POST['storify-display-type'] ) ? sanitize_text_field( $_POST['storify-display-type'] ) : 'embed';
+
+			// @@todo add the nonce check
+
+			// Handle my elements fetching.
+			update_option( 'storify_display_type', $dtype, false );
+
+			// Process the admin redirect.
+			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-type' => 'settings' ), false );
 		}
 
 		// Our trigger from the posts page.
@@ -128,7 +147,7 @@ class StorifyStoryImport_Process {
 			}
 
 			// Process the admin redirect.
-			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings' ), false );
+			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-type' => 'users' ), false );
 		}
 
 		// Do the looping to figure it out all the elements.
@@ -151,7 +170,7 @@ class StorifyStoryImport_Process {
 		}
 
 		// Process the admin redirect.
-		storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings' ), false );
+		storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-type' => 'user' ), false );
 	}
 
 	/**
@@ -171,12 +190,16 @@ class StorifyStoryImport_Process {
 		// Get the path parsed out for the API call.
 		$parsed = parse_url( $single, PHP_URL_PATH );
 
-		// preprint( $parsed, true );
-
 		// Bail with no single URL.
 		if ( empty( $parsed ) ) {
 			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'invalid_single_url' ) );
 		}
+
+		// Split up my parsed bit to get the username and slug.
+		$parts  = explode( '/', trim( $parsed, '/' ) );
+
+		// Parse out the username.
+		$user   = esc_attr( $parts[0] );
 
 		// Fetch our items.
 		$call   = storify_story_import()->make_api_call( 'stories' . $parsed );
@@ -188,6 +211,7 @@ class StorifyStoryImport_Process {
 			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_single_story_content' ) );
 		}
 
+		// preprint( $call['content'], true );
 		// unset( $call['content']['stats'] );
 		// preprint( $call['content'], true );
 		// preprint( array( $call['content'] ), true );
@@ -199,16 +223,13 @@ class StorifyStoryImport_Process {
 
 		// preprint( $stories, true );
 
-		// Parse out the username.
-		$user   = $call['content']['author']['username'];
-
 		// Run the creation.
 		if ( false === $create = self::process_user_stories( $stories, $user ) ) {
 			storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-error' => 'no_single_story_create' ) );
 		}
 
 		// Process the admin redirect.
-		storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings' ), false );
+		storify_story_import()->admin_redirect( array( 'page' => 'storify-import-settings', 'storify-fetch-type' => 'single' ), false );
 	}
 
 	/**
@@ -257,6 +278,8 @@ class StorifyStoryImport_Process {
 			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'no_single_story_content' ) );
 		}
 
+		// preprint( $call['content'], true );
+
 		// unset( $call['content']['stats'] );
 		// unset( $call['content']['author'] );
 
@@ -280,6 +303,16 @@ class StorifyStoryImport_Process {
 
 		// preprint( $merged, true );
 
+		// preprint( $merged[0] );
+		// usort( $merged, array( 'StorifyStoryImport_Helper', 'date_sort_elements' ) );
+		// preprint( $merged[0], true );
+
+		// preprint( $merged[3] );
+		// preprint( $merged[4] );
+		// preprint( $merged[5], true );
+
+		// preprint( $merged[19], true );
+
 		// Parse my list.
 		if ( false === $elements = StorifyStoryImport_Helper::parse_element_list( $merged, $post_id ) ) {
 			storify_story_import()->admin_redirect( array( 'storify-fetch-error' => 'no_single_elements_data' ) );
@@ -293,7 +326,7 @@ class StorifyStoryImport_Process {
 		}
 
 		// Process the admin redirect.
-		storify_story_import()->admin_redirect( null, false );
+		storify_story_import()->admin_redirect( array( 'storify-fetch-type' => 'elements' ), false );
 	}
 
 	/**
@@ -377,6 +410,10 @@ class StorifyStoryImport_Process {
 			return false;
 		}
 
+		// Delete my transients.
+		delete_transient( 'storify_story_elements_' . absint( $post_id ) );
+		delete_transient( 'storify_story_embed_' . absint( $post_id ) );
+
 		// Return true.
 		return true;
 	}
@@ -392,7 +429,7 @@ class StorifyStoryImport_Process {
 	public static function process_story_elements( $elements = array(), $post_id = 0 ) {
 
 		// Fetch my user.
-		$user   = wp_get_current_user();
+		$user   = StorifyStoryImport_Helper::get_userdata_for_import( $post_id );
 
 		// Loop my stories.
 		foreach ( $elements as $element ) {
@@ -409,6 +446,10 @@ class StorifyStoryImport_Process {
 		// Update my elements flag.
 		update_post_meta( $post_id, '_storify_elements', count( $elements ) );
 
+		// Delete my transients.
+		delete_transient( 'storify_story_elements_' . absint( $post_id ) );
+		delete_transient( 'storify_story_embed_' . absint( $post_id ) );
+
 		// And return true.
 		return true;
 	}
@@ -418,24 +459,19 @@ class StorifyStoryImport_Process {
 	 *
 	 * @param  integer $post_id  The post ID we are attaching the element to.
 	 * @param  array   $element  The array of element data.
-	 * @param  object  $user     The user object we pulled from.
+	 * @param  array   $user     An array of the user data we pulled.
 	 *
 	 * @return void
 	 */
 	public static function create_single_element( $element = array(), $post_id = 0, $user ) {
 
-		// Setup my args.
-		$setup  = array(
-			'comment_post_ID'       => absint( $post_id ),
-			'comment_author'        => $user->display_name,
-			'comment_content'       => '',
-			'comment_author_url'    => '',
-			'comment_author_email'  => $user->user_email,
-			'comment_type'          => 'storify-element',
-			'user_id'               => $user->ID,
-			'comment_date'          => date( 'Y-m-d H:i:s', $element['added'] ),
-			'comment_approved'      => 1,
+		// Build the args, adding the post ID so we can update it.
+		$args   = array(
+			'comment_post_ID' => absint( $post_id ),
 		);
+
+		// Call my setup.
+		$setup  = StorifyStoryImport_Helper::format_single_element_setup( $args, $element, $user );
 
 		// Add my "comment",
 		$insert = wp_new_comment( $setup );
@@ -444,14 +480,6 @@ class StorifyStoryImport_Process {
 		if ( empty( $insert ) || is_wp_error( $insert ) ) {
 			return false;
 		}
-
-		// Now all add my meta.
-		add_comment_meta( $insert, '_element_id', $element['id'], true );
-		add_comment_meta( $insert, '_element_eid', $element['eid'], true );
-		add_comment_meta( $insert, '_element_type', $element['type'], true );
-		add_comment_meta( $insert, '_element_link', $element['link'], true );
-		add_comment_meta( $insert, '_element_source', $element['source'], true );
-		add_comment_meta( $insert, '_element_attrib', $element['attrib'], true );
 
 		// And return true.
 		return true;
@@ -463,25 +491,20 @@ class StorifyStoryImport_Process {
 	 * @param  integer $comment_id  The ID we are updating.
 	 * @param  integer $post_id     The post ID we are attaching the element to.
 	 * @param  array   $element     The array of story data.
-	 * @param  object  $user        The user object we pulled from.
+	 * @param  array   $user        An array of the user data we pulled.
 	 *
 	 * @return void
 	 */
 	public static function update_single_element( $comment_id = 0, $element = array(), $post_id = 0, $user ) {
 
-		// Setup my args.
-		$setup  = array(
-			'comment_ID'            => absint( $comment_id ),
-			'comment_post_ID'       => absint( $post_id ),
-			'comment_author'        => $user->display_name,
-			'comment_content'       => '',
-			'comment_author_url'    => '',
-			'comment_author_email'  => $user->user_email,
-			'comment_type'          => 'storify-element',
-			'user_id'               => $user->ID,
-			'comment_date'          => date( 'Y-m-d H:i:s', $element['added'] ),
-			'comment_approved'      => 1,
+		// Build the args, adding the post ID so we can update it.
+		$args   = array(
+			'comment_ID'      => absint( $comment_id ),
+			'comment_post_ID' => absint( $post_id ),
 		);
+
+		// Call my setup.
+		$setup  = StorifyStoryImport_Helper::format_single_element_setup( $args, $element, $user );
 
 		// Add my "comment",
 		$update = wp_update_comment( $setup );
@@ -490,14 +513,6 @@ class StorifyStoryImport_Process {
 		if ( empty( $update ) || is_wp_error( $update ) ) {
 			return false;
 		}
-
-		// Now all add my meta.
-		add_comment_meta( $update, '_element_id', $element['id'], true );
-		add_comment_meta( $update, '_element_eid', $element['eid'], true );
-		add_comment_meta( $update, '_element_type', $element['type'], true );
-		add_comment_meta( $update, '_element_link', $element['link'], true );
-		add_comment_meta( $update, '_element_source', $element['source'], true );
-		add_comment_meta( $update, '_element_attrib', $element['attrib'], true );
 
 		// And return true.
 		return true;
